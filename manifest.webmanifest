@@ -1,0 +1,14 @@
+{
+  "name": "log you 参戦ログ",
+  "short_name": "log you ログ",
+  "description": "log you の公式スケジュールから参戦を記録するアプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0d17",
+  "theme_color": "#7c3aed",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
