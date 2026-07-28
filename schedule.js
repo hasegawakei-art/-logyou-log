@@ -3,7 +3,7 @@
    更新方法: この配列を書き換えるだけ。id は「日付-連番」で固定。
    type: LIVE / TV / RADIO / OTHER
 */
-window.LOGYOU_SCHEDULE_UPDATED = "2026-07-21";
+window.LOGYOU_SCHEDULE_UPDATED = "2026-07-22";
 window.LOGYOU_SCHEDULE = [
   // --- 2025 (デビュー) ---
   { id:"2025-11-15-1", date:"2025-11-15", type:"LIVE",  title:"PEAK SPOT JOIN Vol.1（デビュー公演）", venue:"恵比寿 LIQUIDROOM" },
