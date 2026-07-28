@@ -564,7 +564,11 @@ $('#importInput').addEventListener('change',e=>{ if(e.target.files[0]) importDat
 /* init: jump to current month, or nearest month with events */
 const _t=new Date(); calY=_t.getFullYear(); calM=_t.getMonth();
 refresh();
-if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+if('serviceWorker' in navigator){
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(refreshing)return; refreshing=true; location.reload(); });
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
 </script>
 </body>
 </html>
