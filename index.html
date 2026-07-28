@@ -54,18 +54,32 @@
   .weekdays{display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:4px}
   .weekdays .sun{color:var(--danger)} .weekdays .sat{color:var(--plan)}
   .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px}
-  .cell{aspect-ratio:.86; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:4px 2px; display:flex; flex-direction:column; align-items:center; font-size:12px; cursor:pointer; position:relative}
+  .cell{aspect-ratio:1; min-height:46px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:5px 2px 4px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; font-size:13px; cursor:pointer; position:relative}
   .cell.empty{background:transparent; border:0; cursor:default}
-  .cell.today{border-color:var(--accent); border-width:2px}
-  .cell .dnum{font-weight:700; color:var(--muted)}
+  .cell.today .dnum{background:var(--accent); color:#fff; border-radius:50%; width:24px; height:24px; line-height:24px; text-align:center}
+  .cell.sel{background:var(--surface2); border-color:var(--accent); border-width:2px}
+  .cell .dnum{font-weight:700; color:var(--muted); font-size:14px}
   .cell.has .dnum{color:var(--text)}
   .cell .dnum.sun{color:var(--danger)}
-  .cell .dots{display:flex; gap:2px; margin-top:auto; margin-bottom:1px; flex-wrap:wrap; justify-content:center}
-  .dot{width:7px; height:7px; border-radius:50%; border:1.5px solid var(--muted)}
+  .cell.today .dnum.sun{color:#fff}
+  .cell .dots{display:flex; gap:3px; margin-top:auto; margin-bottom:2px; flex-wrap:wrap; justify-content:center; max-width:100%}
+  .dot{width:8px; height:8px; border-radius:50%; border:1.5px solid var(--muted)}
   .dot.went{background:var(--accent2); border-color:var(--accent2)}
   .dot.plan{background:var(--plan); border-color:var(--plan)}
   .dot.skip{background:transparent; border-color:var(--skip)}
-  .dot.none{background:transparent; border-color:var(--muted); opacity:.6}
+  .dot.none{background:transparent; border-color:var(--accent); opacity:.85}
+  .dot.info{width:5px; height:5px; background:var(--muted); border-color:var(--muted); opacity:.4}
+  /* agenda under calendar (mobile-first) */
+  .agenda{margin-top:16px}
+  .agenda-head{display:flex; align-items:baseline; gap:8px; margin:0 2px 10px; padding-top:14px; border-top:1px solid var(--border)}
+  .agenda-head .ad{font-size:17px; font-weight:800}
+  .agenda-head .aw{font-size:13px; color:var(--muted)}
+  .agenda-head .ac{margin-left:auto; font-size:12px; color:var(--muted); font-weight:700}
+  .agenda-empty{text-align:center; color:var(--muted); padding:18px 10px; font-size:14px}
+  .cal-legend{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:12px 0 0; font-size:11px; color:var(--muted)}
+  .cal-legend span{display:inline-flex; align-items:center; gap:4px}
+  .lg{width:9px; height:9px; border-radius:50%; display:inline-block}
+  .lg.went{background:var(--accent2)} .lg.plan{background:var(--plan)} .lg.none{border:1.5px solid var(--accent)} .lg.info{width:6px;height:6px;background:var(--muted);opacity:.5}
   /* event rows (list & day) */
   .ev{display:flex; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:13px; margin-bottom:10px; box-shadow:var(--shadow); position:relative; overflow:hidden}
   .ev.went{border-left:4px solid var(--accent2)}
@@ -180,6 +194,13 @@
     <div class="cal-summary" id="calSummary"></div>
     <div class="weekdays"><div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div></div>
     <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend">
+      <span><i class="lg went"></i>参加</span>
+      <span><i class="lg plan"></i>予定</span>
+      <span><i class="lg none"></i>未記録LIVE</span>
+      <span><i class="lg info"></i>TV/配信等</span>
+    </div>
+    <div class="agenda" id="calAgenda"></div>
     <div class="footer-note" id="updNote"></div>
   </section>
 
@@ -259,6 +280,7 @@ const OFFICIAL = (window.LOGYOU_SCHEDULE||[]).map(e=>({...e, official:true}));
 
 let store=load();            // {attend:{}, notes:{}, custom:[]}
 let calY, calM;              // displayed month
+let selectedDay=null;        // ISO of day selected in calendar
 let typeFilter='ALL';
 let edit={id:null, custom:false, rating:0, photos:[], setlistItems:[]};
 
@@ -313,21 +335,46 @@ function renderCalendar(){
   const byDay={};
   monthEv.forEach(e=>{ const d=+e.date.slice(8,10); (byDay[d]=byDay[d]||[]).push(e); });
   const t=new Date(), thisM=t.getFullYear()===calY&&t.getMonth()===calM;
+  // choose a default selected day when month changes
+  if(!selectedDay || !selectedDay.startsWith(pfx)){
+    const days=Object.keys(byDay).map(Number).sort((a,b)=>a-b);
+    if(thisM){
+      const td=t.getDate();
+      if(byDay[td]) selectedDay=todayISO();
+      else { const up=days.find(d=>d>=td); const pick=up||days[days.length-1]||td; selectedDay=`${pfx}-${String(pick).padStart(2,'0')}`; }
+    } else {
+      selectedDay=`${pfx}-${String(days[0]||1).padStart(2,'0')}`;
+    }
+  }
+  const selDay=+selectedDay.slice(8,10);
   let html='';
   for(let i=0;i<startW;i++) html+=`<div class="cell empty"></div>`;
   for(let day=1;day<=daysIn;day++){
     const evs=byDay[day]||[];
     const dow=new Date(calY,calM,day).getDay();
-    const dots=evs.slice(0,4).map(e=>`<span class="dot ${attendOf(e.id)||'none'}"></span>`).join('');
-    html+=`<div class="cell ${evs.length?'has':''} ${thisM&&t.getDate()===day?'today':''}" data-day="${day}">
+    const dots=evs.slice(0,4).map(e=>`<span class="dot ${e.type==='LIVE'?(attendOf(e.id)||'none'):'info'}"></span>`).join('');
+    const cls=`${evs.length?'has':''} ${thisM&&t.getDate()===day?'today':''} ${day===selDay?'sel':''}`;
+    html+=`<div class="cell ${cls}" data-day="${day}">
       <span class="dnum ${dow===0?'sun':''}">${day}</span><div class="dots">${dots}</div></div>`;
   }
   const g=$('#calGrid'); g.innerHTML=html;
   g.querySelectorAll('.cell[data-day]').forEach(c=>c.addEventListener('click',()=>{
-    const day=+c.dataset.day, evs=byDay[day]||[];
-    const iso=`${pfx}-${String(day).padStart(2,'0')}`;
-    if(evs.length) openDay(iso,evs); else openCustom(iso);
+    selectedDay=`${pfx}-${String(c.dataset.day).padStart(2,'0')}`;
+    renderCalendar();
   }));
+  renderAgenda();
+}
+function renderAgenda(){
+  const iso=selectedDay; const a=$('#calAgenda'); if(!a) return;
+  if(!iso){ a.innerHTML=''; return; }
+  const d=new Date(iso+'T00:00:00');
+  const evs=allEvents().filter(e=>e.date===iso).sort((x,y)=>x.id>y.id?1:-1);
+  let html=`<div class="agenda-head"><span class="ad">${d.getMonth()+1}月${d.getDate()}日</span><span class="aw">(${WD[d.getDay()]})</span><span class="ac">${evs.length?evs.length+'件':''}</span></div>`;
+  html += evs.length ? evs.map(evRow).join('') : `<div class="agenda-empty">この日の予定はありません</div>`;
+  html += `<button class="btn-ghost" id="agendaAdd" style="margin-top:4px">＋ この日に予定を手動追加</button>`;
+  a.innerHTML=html;
+  wireEvRows(a);
+  $('#agendaAdd').addEventListener('click',()=>openCustom(iso));
 }
 
 /* ---- event row ---- */
@@ -343,11 +390,11 @@ function evRow(e){
       ${n.rating?`<span class="stars-mini" style="margin-left:6px">${'★'.repeat(n.rating)}</span>`:''}
       <h3>${esc(e.title)}</h3>
       ${e.venue?`<p class="vn">📍 ${esc(e.venue)}</p>`:''}
-      <div class="attend-toggle">
+      ${e.type==='LIVE'?`<div class="attend-toggle">
         <button data-v="went" class="${st==='went'?'on':''}">参加</button>
         <button data-v="plan" class="${st==='plan'?'on':''}">予定</button>
         <button data-v="skip" class="${st==='skip'?'on':''}">不参加</button>
-      </div>
+      </div>`:''}
     </div></div>`;
 }
 function wireEvRows(root){
@@ -403,12 +450,12 @@ function openDetail(id){
       <h2>${esc(e.title)}</h2>
       ${e.venue?`<p class="tl">📍 ${esc(e.venue)}</p>`:''}
     </div>
-    <label>参加ステータス</label>
+    ${e.type==='LIVE'?`<label>参加ステータス</label>
     <div class="segmented" id="dStatus">
       <button data-v="went" class="${st==='went'?'on':''}">参加した</button>
       <button data-v="plan" class="${st==='plan'?'on':''}">予定</button>
       <button data-v="skip" class="${st==='skip'?'on':''}">不参加</button>
-    </div>
+    </div>`:`<p style="color:var(--muted);font-size:13px;margin:10px 0 0">${e.type==='TV'?'TV出演':e.type==='RADIO'?'ラジオ出演':'イベント/配信'}（参加率の対象外）</p>`}
     <label>楽しんだ度</label>
     <div class="stars" id="dStars">${[1,2,3,4,5].map(i=>`<span class="s ${i<=n.rating?'on':''}" data-n="${i}">★</span>`).join('')}</div>
     ${gal}
@@ -418,10 +465,11 @@ function openDetail(id){
       <button id="dEdit">✏️ 記録を編集</button>
       ${e.official?'':'<button class="del-btn" id="dDel">🗑 予定を削除</button>'}
     </div>`;
-  // inline attend
-  $('#dStatus').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+  // inline attend (LIVE only)
+  const ds=$('#dStatus');
+  if(ds) ds.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
     const v=b.dataset.v; if(store.attend[id]===v) delete store.attend[id]; else store.attend[id]=v;
-    save(); $('#dStatus').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===store.attend[id])); refresh();
+    save(); ds.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===store.attend[id])); refresh();
   }));
   // inline rating
   $('#dStars').querySelectorAll('.s').forEach(s=>s.addEventListener('click',()=>{

@@ -1,5 +1,5 @@
 // 参戦ログ - Service Worker (offline cache)
-const CACHE = 'logyou-log-v3';
+const CACHE = 'logyou-log-v4';
 const ASSETS = [
   './',
   './index.html',
