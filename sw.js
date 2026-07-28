@@ -1,5 +1,6 @@
-// 参戦ログ - Service Worker (offline cache)
-const CACHE = 'logyou-log-v4';
+// log you 参戦ログ - Service Worker
+// network-first: オンライン時は常に最新を取得し、オフライン時のみキャッシュを使う
+const CACHE = 'logyou-log-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -22,10 +23,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
-      return res;
-    }).catch(() => caches.match('./index.html')))
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(e.request).then(hit => hit || caches.match('./index.html')))
   );
 });
