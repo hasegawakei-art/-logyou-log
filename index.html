@@ -225,6 +225,9 @@
     </div>
     <div id="list"></div>
     <div class="settings-row">
+      <button id="btnHidden">🚫 非表示の予定</button>
+    </div>
+    <div class="settings-row">
       <button id="btnExport">⬇ バックアップ</button>
       <button id="btnImport">⬆ 復元</button>
     </div>
@@ -289,7 +292,7 @@ let selectedDay=null;        // ISO of day selected in calendar
 let typeFilter='ALL';
 let edit={id:null, custom:false, rating:0, photos:[], setlistItems:[]};
 
-function load(){ try{ const o=JSON.parse(localStorage.getItem(KEY))||{}; return {attend:o.attend||{}, notes:o.notes||{}, custom:o.custom||[]}; }catch(e){ return {attend:{},notes:{},custom:[]}; } }
+function load(){ try{ const o=JSON.parse(localStorage.getItem(KEY))||{}; return {attend:o.attend||{}, notes:o.notes||{}, custom:o.custom||[], hidden:o.hidden||{}}; }catch(e){ return {attend:{},notes:{},custom:[],hidden:{}}; } }
 function save(){ try{ localStorage.setItem(KEY,JSON.stringify(store)); return true; }catch(e){ toast('⚠ 保存容量が上限です。写真を減らすかバックアップを'); return false; } }
 function uid(){ return 'c'+Math.random().toString(36).slice(2,8)+Date.now().toString(36); }
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
@@ -297,6 +300,8 @@ function esc(s){ return (s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','
 const WD=['日','月','火','水','木','金','土'];
 
 function allEvents(){ return OFFICIAL.concat(store.custom.map(e=>({...e,official:false}))); }
+function visibleEvents(){ return allEvents().filter(e=>!store.hidden[e.id]); }
+function hiddenList(){ return Object.keys(store.hidden).filter(id=>store.hidden[id]).map(evById).filter(Boolean).sort((a,b)=>a.date.localeCompare(b.date)); }
 function evById(id){ return allEvents().find(e=>e.id===id); }
 function attendOf(id){ return store.attend[id]||''; }
 function noteOf(id){ return store.notes[id]||{rating:0,memo:'',photos:[],setlist:[]}; }
@@ -305,13 +310,15 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 /* ---- stats ---- */
 function updateStats(){
-  const live=allEvents().filter(e=>e.type==='LIVE');
+  const live=visibleEvents().filter(e=>e.type==='LIVE');
   const went=live.filter(e=>attendOf(e.id)==='went');
   const skip=live.filter(e=>attendOf(e.id)==='skip');
   $('#stWent').textContent=went.length;
   $('#stRate').textContent=(went.length+skip.length)>0 ? Math.round(went.length/(went.length+skip.length)*100)+'%' : '—';
   const ym=todayISO().slice(0,7);
   $('#stMonth').textContent=went.filter(e=>e.date.startsWith(ym)).length;
+  const hc=Object.keys(store.hidden).filter(id=>store.hidden[id]).length;
+  const hb=$('#btnHidden'); if(hb) hb.textContent = hc ? `🚫 非表示の予定（${hc}）` : '🚫 非表示の予定';
   const u=window.LOGYOU_SCHEDULE_UPDATED;
   $('#updNote').innerHTML = `公式スケジュール${OFFICIAL.length}件を収録${u?`（最終更新 ${u}）`:''}<br>スケジュールの最新化はClaudeに「log youの予定を更新して」と頼んでね`;
 }
@@ -326,7 +333,7 @@ function renderCalendar(){
   const first=new Date(calY,calM,1), startW=first.getDay();
   const daysIn=new Date(calY,calM+1,0).getDate();
   const pfx=monthPrefix();
-  const monthEv=allEvents().filter(e=>e.date.startsWith(pfx));
+  const monthEv=visibleEvents().filter(e=>e.date.startsWith(pfx));
   const live=monthEv.filter(e=>e.type==='LIVE');
   const went=live.filter(e=>attendOf(e.id)==='went').length;
   const plan=live.filter(e=>attendOf(e.id)==='plan').length;
@@ -373,7 +380,7 @@ function renderAgenda(){
   const iso=selectedDay; const a=$('#calAgenda'); if(!a) return;
   if(!iso){ a.innerHTML=''; return; }
   const d=new Date(iso+'T00:00:00');
-  const evs=allEvents().filter(e=>e.date===iso).sort((x,y)=>x.id>y.id?1:-1);
+  const evs=visibleEvents().filter(e=>e.date===iso).sort((x,y)=>x.id>y.id?1:-1);
   let html=`<div class="agenda-head"><span class="ad">${d.getMonth()+1}月${d.getDate()}日</span><span class="aw">(${WD[d.getDay()]})</span><span class="ac">${evs.length?evs.length+'件':''}</span></div>`;
   html += evs.length ? evs.map(evRow).join('') : `<div class="agenda-empty">この日の予定はありません</div>`;
   html += `<button class="btn-ghost" id="agendaAdd" style="margin-top:4px">＋ この日に予定を手動追加</button>`;
@@ -418,7 +425,7 @@ function wireEvRows(root){
 /* ---- list ---- */
 function renderList(){
   const pfx=monthPrefix();
-  let evs=allEvents().filter(e=>e.date.startsWith(pfx));
+  let evs=visibleEvents().filter(e=>e.date.startsWith(pfx));
   if(typeFilter!=='ALL') evs=evs.filter(e=>e.type===typeFilter);
   evs.sort((a,b)=>a.date.localeCompare(b.date)|| (a.id>b.id?1:-1));
   const list=$('#list');
@@ -436,6 +443,19 @@ function openDay(iso,evs){
   $('#dayContent').innerHTML=html;
   wireEvRows($('#dayContent'));
   $('#dayAdd').addEventListener('click',()=>{ closeSheet('#daySheet'); setTimeout(()=>openCustom(iso),120); });
+  openSheet('#daySheet');
+}
+function openHidden(){
+  const evs=hiddenList();
+  let html=`<div class="grip"></div><h2>非表示の予定</h2><p style="color:var(--muted);font-size:13px;margin:0 0 14px">${evs.length?'「戻す」を押すと一覧に再表示されます':'非表示の予定はありません'}</p>`;
+  html+=evs.map(e=>{ const d=new Date(e.date+'T00:00:00');
+    return `<div class="ev"><div class="ev-date"><div class="d">${d.getDate()}</div><div class="w">${WD[d.getDay()]}</div></div>
+      <div class="ev-body"><span class="tp tp-${e.type}">${e.type==='OTHER'?'その他':e.type}</span>
+      <h3>${esc(e.title)}</h3><p class="vn">${e.date.replace(/-/g,'.')}</p>
+      <div class="attend-toggle"><button data-restore="${e.id}">↩ 一覧に戻す</button></div></div></div>`;
+  }).join('');
+  $('#dayContent').innerHTML=html;
+  $('#dayContent').querySelectorAll('[data-restore]').forEach(b=>b.addEventListener('click',()=>{ delete store.hidden[b.dataset.restore]; save(); refresh(); openHidden(); toast('一覧に戻しました'); }));
   openSheet('#daySheet');
 }
 
@@ -468,7 +488,7 @@ function openDetail(id){
     ${hasS?`<div class="sl-title">🎵 セットリスト <span class="count">全${songCount(n)}曲</span></div>${slH}`:''}
     <div class="actions">
       <button id="dEdit">✏️ 記録を編集</button>
-      ${e.official?'':'<button class="del-btn" id="dDel">🗑 予定を削除</button>'}
+      ${e.official?'<button class="del-btn" id="dHide">🗑 一覧から削除</button>':'<button class="del-btn" id="dDel">🗑 予定を削除</button>'}
     </div>`;
   // inline attend (LIVE only)
   const ds=$('#dStatus');
@@ -485,6 +505,7 @@ function openDetail(id){
   $('#detailContent').querySelectorAll('.detail-gallery img').forEach(im=>im.addEventListener('click',()=>{ $('#lightboxImg').src=im.dataset.full; $('#lightbox').classList.add('open'); }));
   $('#dEdit').addEventListener('click',()=>{ closeSheet('#detailSheet'); setTimeout(()=>openEdit(id),120); });
   const del=$('#dDel'); if(del) del.addEventListener('click',()=>{ if(confirm('この予定を削除しますか？')){ store.custom=store.custom.filter(x=>x.id!==id); delete store.attend[id]; delete store.notes[id]; save(); refresh(); closeSheet('#detailSheet'); toast('削除しました'); } });
+  const hide=$('#dHide'); if(hide) hide.addEventListener('click',()=>{ if(confirm('この予定を一覧から削除しますか？\n（あとで「非表示の予定」から戻せます）')){ store.hidden[id]=true; save(); refresh(); closeSheet('#detailSheet'); toast('一覧から削除しました'); } });
   openSheet('#detailSheet');
 }
 
@@ -537,7 +558,7 @@ function saveEdit(){
 
 /* ---- backup ---- */
 function exportData(){ const blob=new Blob([JSON.stringify(store,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); const t=new Date(); a.download=`logyou-log_${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(a.href); toast('バックアップを書き出しました'); }
-function importData(file){ const fr=new FileReader(); fr.onload=e=>{ try{ const o=JSON.parse(e.target.result); if(typeof o!=='object') throw 0; if(!confirm('記録を読み込みます。現在のデータは置き換えられます。よろしいですか？')) return; store={attend:o.attend||{},notes:o.notes||{},custom:o.custom||[]}; save(); refresh(); toast('復元しました'); }catch(err){ toast('ファイルを読み込めませんでした'); } }; fr.readAsText(file); }
+function importData(file){ const fr=new FileReader(); fr.onload=e=>{ try{ const o=JSON.parse(e.target.result); if(typeof o!=='object') throw 0; if(!confirm('記録を読み込みます。現在のデータは置き換えられます。よろしいですか？')) return; store={attend:o.attend||{},notes:o.notes||{},custom:o.custom||[],hidden:o.hidden||{}}; save(); refresh(); toast('復元しました'); }catch(err){ toast('ファイルを読み込めませんでした'); } }; fr.readAsText(file); }
 
 /* ---- sheets / view ---- */
 function openSheet(s){ $(s).classList.add('open'); document.body.style.overflow='hidden'; }
@@ -561,6 +582,7 @@ $('#starInput').querySelectorAll('.s').forEach(s=>s.addEventListener('click',()=
 $('#photoInput').addEventListener('change',e=>{ handlePhotos(e.target.files); e.target.value=''; });
 document.querySelectorAll('.sheet-backdrop').forEach(bd=>bd.addEventListener('click',e=>{ if(e.target===bd) closeSheet('#'+bd.id); }));
 $('#lightbox').addEventListener('click',()=>$('#lightbox').classList.remove('open'));
+$('#btnHidden').addEventListener('click',openHidden);
 $('#btnExport').addEventListener('click',exportData);
 $('#btnImport').addEventListener('click',()=>$('#importInput').click());
 $('#importInput').addEventListener('change',e=>{ if(e.target.files[0]) importData(e.target.files[0]); e.target.value=''; });
