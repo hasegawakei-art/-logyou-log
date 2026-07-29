@@ -31,7 +31,10 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; background:var(--bg); color:var(--text); padding-bottom:calc(90px + env(safe-area-inset-bottom)); min-height:100vh; line-height:1.5;}
+  html{overflow-x:hidden}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; background:var(--bg); color:var(--text); padding-bottom:calc(90px + env(safe-area-inset-bottom)); min-height:100vh; line-height:1.5; overflow-x:hidden; width:100%; max-width:100%;}
+  h1,h2,h3,p{overflow-wrap:anywhere}
+  *{min-width:0}
   .app-header{position:sticky; top:0; z-index:20; background:var(--surface); color:var(--text); padding:calc(14px + env(safe-area-inset-top)) 18px 12px; border-bottom:1px solid var(--border);}
   .app-header h1{margin:0; font-size:19px; font-weight:800; display:flex; align-items:center; gap:8px}
   .app-header .sub{margin:3px 0 0; font-size:12px; color:var(--muted)}
@@ -48,7 +51,8 @@
   .month-nav button{background:var(--surface); border:1px solid var(--border); color:var(--text); width:40px; height:40px; border-radius:12px; font-size:20px; cursor:pointer}
   .month-nav .mlabel{font-size:18px; font-weight:800}
   .cal-summary{display:flex; gap:8px; margin:4px 0 14px; flex-wrap:wrap}
-  .cal-summary .chip{flex:1; min-width:66px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:9px 6px; text-align:center}
+  .cal-summary .chip{flex:1 1 0; min-width:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:9px 4px; text-align:center}
+  .cal-summary .chip span{white-space:nowrap; font-size:10px}
   .cal-summary .chip b{display:block; font-size:18px; font-weight:800}
   .cal-summary .chip span{font-size:10.5px; color:var(--muted)}
   .cal-summary .chip.rate b{color:var(--accent)}
@@ -174,9 +178,9 @@
   <h1>🎤 log you 参戦ログ</h1>
   <p class="sub">公式スケジュールから、参戦を記録</p>
   <div class="stats">
-    <div class="stat"><b id="stWent">0</b><span>参戦回数</span></div>
-    <div class="stat"><b id="stRate">—</b><span>参加率</span></div>
-    <div class="stat"><b id="stMonth">0</b><span>今月参戦</span></div>
+    <div class="stat"><b id="stWent">0</b><span>通算 参戦</span></div>
+    <div class="stat"><b id="stRate">—</b><span>通算 参加率</span></div>
+    <div class="stat"><b id="stMonth">0</b><span>今月 参戦</span></div>
   </div>
   <div class="tabs">
     <button class="tab active" data-view="cal">📅 カレンダー</button>
@@ -332,7 +336,7 @@ function renderCalendar(){
     <div class="chip"><b>${live.length}</b><span>LIVE数</span></div>
     <div class="chip"><b style="color:var(--accent2)">${went}</b><span>参加</span></div>
     <div class="chip"><b style="color:var(--plan)">${plan}</b><span>予定</span></div>
-    <div class="chip rate"><b>${rate}</b><span>参加率</span></div>`;
+    <div class="chip rate"><b>${rate}</b><span>今月 参加率</span></div>`;
   const byDay={};
   monthEv.forEach(e=>{ const d=+e.date.slice(8,10); (byDay[d]=byDay[d]||[]).push(e); });
   const t=new Date(), thisM=t.getFullYear()===calY&&t.getMonth()===calM;
@@ -560,6 +564,9 @@ $('#lightbox').addEventListener('click',()=>$('#lightbox').classList.remove('ope
 $('#btnExport').addEventListener('click',exportData);
 $('#btnImport').addEventListener('click',()=>$('#importInput').click());
 $('#importInput').addEventListener('change',e=>{ if(e.target.files[0]) importData(e.target.files[0]); e.target.value=''; });
+
+/* データを消えにくくする：OSにストレージ永続化を要求（iOS等の自動削除対策） */
+if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(()=>{}); }
 
 /* init: jump to current month, or nearest month with events */
 const _t=new Date(); calY=_t.getFullYear(); calM=_t.getMonth();
