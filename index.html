@@ -256,7 +256,8 @@
           <select id="fType"><option value="LIVE">LIVE</option><option value="TV">TV</option><option value="RADIO">RADIO</option><option value="OTHER">その他</option></select>
         </div>
       </div>
-      <label>会場</label><input type="text" id="fVenue" placeholder="会場名">
+      <label>会場</label><input type="text" id="fVenue" placeholder="会場名（入力 or 選択）" list="venueList" autocomplete="off">
+      <datalist id="venueList"></datalist>
     </div>
     <label>楽しんだ度</label>
     <div class="stars" id="starInput"><span class="s" data-n="1">★</span><span class="s" data-n="2">★</span><span class="s" data-n="3">★</span><span class="s" data-n="4">★</span><span class="s" data-n="5">★</span></div>
@@ -529,15 +530,19 @@ function openEdit(id){
   $('#editTitle').textContent = e.official ? '記録を編集' : '予定・記録を編集';
   $('#customFields').style.display = e.official ? 'none':'block';
   if(!e.official){ $('#fTitle').value=e.title; $('#fDate').value=e.date; $('#fType').value=e.type; $('#fVenue').value=e.venue||''; }
-  setStars(edit.rating); renderPhotos(); fillSetlist(edit.setlistItems); $('#fMemo').value=n.memo||'';
+  setStars(edit.rating); renderPhotos(); fillSetlist(edit.setlistItems); fillVenueList(); $('#fMemo').value=n.memo||'';
   openSheet('#editSheet');
 }
 function openCustom(presetDate){
   edit={id:uid(), custom:true, rating:0, photos:[], setlistItems:[]};
   $('#editTitle').textContent='予定を手動追加'; $('#customFields').style.display='block';
   $('#fTitle').value=''; $('#fDate').value=presetDate||todayISO(); $('#fType').value='LIVE'; $('#fVenue').value='';
-  setStars(0); renderPhotos(); fillSetlist([]); $('#fMemo').value='';
+  setStars(0); renderPhotos(); fillSetlist([]); fillVenueList(); $('#fMemo').value='';
   openSheet('#editSheet');
+}
+function fillVenueList(){
+  const set=[...new Set(allEvents().map(e=>(e.venue||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+  $('#venueList').innerHTML=set.map(v=>`<option value="${esc(v)}"></option>`).join('');
 }
 function setStars(v){ edit.rating=v; $('#starInput').querySelectorAll('.s').forEach(s=>s.classList.toggle('on',+s.dataset.n<=v)); }
 function saveEdit(){
